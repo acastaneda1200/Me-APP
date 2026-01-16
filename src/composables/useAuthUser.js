@@ -1,61 +1,40 @@
-import { ref } from "vue";
-import { supabase } from 'boot/supabase'
-// import { useAuthStore } from 'stores/auth';
-// import {storeToRefs} from 'pinia'
+import { storeToRefs } from 'pinia';
+import { useAuthStore } from 'stores/auth';
 
-const user = ref(null)
-export default function useAuthUser(){
-    // const authStore = useAuthStore();
-    // const { user } = storeToRefs(authStore);
+export default function useAuthUser() {
+    const authStore = useAuthStore();
+    const { user } = storeToRefs(authStore);
 
-    const login = async ({email, password}) => {
-        const {user, error} = await supabase.auth.signInWithPassword({email, password})
-        if (error) throw error
-        return user
-    }
+    const login = async ({ email, password }) => {
+        return await authStore.login(email, password);
+    };
 
-    const loginWithSocialProvider = async (provider) => {
-        const {user, error} = await supabase.auth.signIn({provider})
-        if (error) throw error
-        return user
-    }
+    const register = async (data) => {
+        return await authStore.register(data);
+    };
 
     const logout = async () => {
-        const {error} = await supabase.auth.signOut()
-        if (error) throw error
-    }
-    
-    const isLoggedIn = () => {
-        return !!user.value
-    }
+        return authStore.logout();
+    };
 
-    const register = async ({email, password, ...meta}) => {
-        const { user, error } = await supabase.auth.signUp(
-            {
-                email,
-                password,
-                options: {
-                    data: meta,
-                    emailRedirectTo: `${window.location.origin}/main`
-                }
-            },
-           
-        )
-        if (error) throw error
-        return user
-    }
+    const isLoggedIn = () => {
+        return authStore.isAuthenticated;
+    };
+
+    // Keep other methods as stubs or implement if needed
+    const loginWithSocialProvider = async (provider) => {
+        console.warn('Social login not implemented in new backend');
+        throw new Error('Social login not supported');
+    };
 
     const update = async (data) => {
-        const {user, error} = await supabase.auth.update(data)
-        if (error) throw error
-        return user
-    }
+        console.warn('Update user not implemented yet');
+    };
 
-    const sendPasswordResetEmail = async (email) =>{
-        const {user, error} = await supabase.auth.api.resetPasswordForEmail(email)
-        if (error) throw error
-        return user
-    }
+    const sendPasswordResetEmail = async (email) => {
+        console.warn('Password reset not implemented yet');
+        // throw new Error('Password reset not supported');
+    };
 
     return {
         user,
@@ -66,7 +45,5 @@ export default function useAuthUser(){
         register,
         update,
         sendPasswordResetEmail,
-    }
-
-
+    };
 }

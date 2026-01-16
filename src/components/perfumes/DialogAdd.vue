@@ -38,7 +38,7 @@
                       accept="image/*"
                       v-model="image"
                       label="Imagen"
-                      :rules="[(val) => !!val.size || 'Imagen es requerido']"
+                      :rules="[(val) => !!val || 'Imagen es requerido']"
                     >
                       <template v-slot:prepend>
                         <q-icon name="cloud_upload" />
@@ -56,11 +56,11 @@
                     <!-- Dia -->
                     <q-input
                       outlined
-                      v-model="form.day"
-                      mask="###"
+                      v-model.number="form.day"
+                      type="number"
                       label="Dia"
                       :rules="[
-                        (val) => !!val || 'Dia es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -75,11 +75,11 @@
                     <!-- Noche -->
                     <q-input
                       outlined
-                      v-model="form.night"
+                      v-model.number="form.night"
                       type="number"
                       label="Noche"
                       :rules="[
-                        (val) => !!val || 'Noche es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -94,11 +94,11 @@
                     <!-- Invierno -->
                     <q-input
                       outlined
-                      v-model="form.winter"
-                      mask="###"
+                      v-model.number="form.winter"
+                      type="number"
                       label="Invierno"
                       :rules="[
-                        (val) => !!val || 'Invierno es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -113,11 +113,11 @@
                     <!-- Primevera -->
                     <q-input
                       outlined
-                      v-model="form.spring"
-                      mask="###"
+                      v-model.number="form.spring"
+                      type="number"
                       label="Primavera"
                       :rules="[
-                        (val) => !!val || 'Primavera es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -132,11 +132,11 @@
                     <!-- Verano -->
                     <q-input
                       outlined
-                      v-model="form.summer"
-                      mask="###"
+                      v-model.number="form.summer"
+                      type="number"
                       label="Verano"
                       :rules="[
-                        (val) => !!val || 'Verano es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -151,11 +151,11 @@
                     <!-- Otoño -->
                     <q-input
                       outlined
-                      v-model="form.autumn"
-                      mask="###"
+                      v-model.number="form.autumn"
+                      type="number"
                       label="Otoño"
                       :rules="[
-                        (val) => !!val || 'Otoño es requerido',
+                        (val) => val >= 0 || 'Requerido',
                         (val) => val <= 100 || 'Maximo 100',
                       ]"
                     />
@@ -181,6 +181,7 @@
                   color="primary"
                   flat
                   class="q-ml-sm"
+                  @click="onReset"
                 />
               </q-card-actions>
             </q-card>
@@ -193,13 +194,13 @@
 
 <script setup>
 import useUI from "composables/useUI";
-import useApiSp from "src/composables/useApiSP";
+import useUploads from "src/composables/useUploads";
 import useNotify from "src/composables/useNotify";
+import { useItemsStore } from "stores/items";
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+
 const { addDialogPerfume, handleAddDialogPerfume } = useUI();
 const loading = ref(false);
-const router = useRouter();
 const emit = defineEmits(["uploadListPerfume"]);
 
 const initialFormValues = {
@@ -210,45 +211,61 @@ const initialFormValues = {
   spring: 0,
   summer: 0,
   autumn: 0,
-  img_path: null,
-  img_dupe_path: null,
-  dupe: null,
 };
 
 const form = ref({ ...initialFormValues });
-const image = ref([]);
-const { uploadImage, insertRow } = useApiSp();
+const image = ref(null);
+const { uploadFile } = useUploads();
 const { notify } = useNotify();
+const itemsStore = useItemsStore();
 
 const onSubmit = async () => {
   try {
     loading.value = true;
-    handleUploadImage();
-    const [{ id }] = await insertRow(form.value, "perfume");
-    console.log(id);
+    let imageUrl = null;
+    
+    if (image.value) {
+        const uploadResult = await uploadFile(image.value);
+        // Assuming backend returns { url: '...' } or just the url string, or object with key.
+        // Adjust based on actual backend response.
+        imageUrl = uploadResult.url || uploadResult.location || uploadResult; 
+    }
+
+    const perfumeStats = {
+        day: form.value.day,
+        night: form.value.night,
+        winter: form.value.winter,
+        spring: form.value.spring,
+        summer: form.value.summer,
+        autumn: form.value.autumn
+    };
+
+    const itemData = {
+        name: form.value.name,
+        category: 'PERFUME',
+        priority: 'MEDIUM',
+        status: 'WANTED', // Or OTHER?
+        estimatedPrice: 0,
+        imageUrl: imageUrl,
+        notes: JSON.stringify(perfumeStats)
+    };
+
+    await itemsStore.createItem(itemData);
+    
     notify({ message: "Registrado correctamente", type: "positive" });
     onReset();
     handleAddDialogPerfume();
     emit("uploadListPerfume");
   } catch (error) {
-    notify({ message: error.message, type: "negative" });
+    notify({ message: error.message || 'Error creating item', type: "negative" });
   } finally {
     loading.value = false;
   }
 };
 
-const handleUploadImage = async () => {
-  const imgFile = image.value;
-  const { publicUrl } = await uploadImage(imgFile, "perfume_bucket");
-  form.value.img_path = publicUrl;
-  console.log(publicUrl);
-  console.log(form.value);
-};
-
 const onReset = () => {
-  loading.value = null;
-  Object.assign(form.value, { ...initialFormValues });
-  image.value = [];
+  Object.assign(form.value, initialFormValues);
+  image.value = null;
 };
 </script>
 
